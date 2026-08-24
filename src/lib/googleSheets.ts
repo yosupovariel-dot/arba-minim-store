@@ -4,6 +4,8 @@ import { prisma } from "@/lib/prisma";
 import { formatILS } from "@/lib/pricing";
 
 const SHEET_NAME = "הזמנות";
+// One row per order ITEM (an order with 3 different sets becomes 3 rows
+// sharing the same order number) — easiest to filter/pivot in a sheet.
 const HEADER = [
   "מס' הזמנה",
   "תאריך",
@@ -11,7 +13,11 @@ const HEADER = [
   "טלפון",
   "אימייל",
   "סט",
-  "מחיר",
+  "סוג אתרוג",
+  "כמות",
+  "מחיר ליחידה",
+  "סה\"כ לפריט",
+  "מחיר כולל להזמנה",
   "מקדמה נדרשת",
   "לקוח סימן תשלום",
   "מקדמה אושרה",
@@ -59,25 +65,34 @@ export async function resyncOrdersSheet() {
     const spreadsheetId = process.env.GOOGLE_SHEETS_SPREADSHEET_ID!;
     const sheets = getSheetsClient();
 
-    const orders = await prisma.order.findMany({ orderBy: { orderNumber: "asc" } });
+    const orders = await prisma.order.findMany({
+      orderBy: { orderNumber: "asc" },
+      include: { items: true },
+    });
 
-    const rows = orders.map((o) => [
-      o.orderNumber,
-      new Date(o.createdAt).toLocaleString("he-IL"),
-      o.customerName,
-      o.phone,
-      o.email || "",
-      o.setNameSnapshot,
-      formatILS(o.priceSnapshot / 100),
-      formatILS(o.depositAmount / 100),
-      o.depositMarkedPaid ? "כן" : "לא",
-      o.depositConfirmed ? "כן" : "לא",
-      STATUS_LABEL[o.status] || o.status,
-      o.neighborhood,
-      o.address,
-      o.notes || "",
-      o.adminNotes || "",
-    ]);
+    const rows = orders.flatMap((o) =>
+      o.items.map((item) => [
+        o.orderNumber,
+        new Date(o.createdAt).toLocaleString("he-IL"),
+        o.customerName,
+        o.phone,
+        o.email || "",
+        item.setNameSnapshot,
+        item.etrogTypeSnapshot,
+        item.quantity,
+        formatILS(item.unitPrice / 100),
+        formatILS((item.unitPrice * item.quantity) / 100),
+        formatILS(o.totalPrice / 100),
+        formatILS(o.depositAmount / 100),
+        o.depositMarkedPaid ? "כן" : "לא",
+        o.depositConfirmed ? "כן" : "לא",
+        STATUS_LABEL[o.status] || o.status,
+        o.neighborhood,
+        o.address,
+        o.notes || "",
+        o.adminNotes || "",
+      ])
+    );
 
     await sheets.spreadsheets.values.update({
       spreadsheetId,
@@ -88,7 +103,7 @@ export async function resyncOrdersSheet() {
 
     await sheets.spreadsheets.values.clear({
       spreadsheetId,
-      range: `${SHEET_NAME}!A2:O100000`,
+      range: `${SHEET_NAME}!A2:S100000`,
     });
 
     if (rows.length > 0) {

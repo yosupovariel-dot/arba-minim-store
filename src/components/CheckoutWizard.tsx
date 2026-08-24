@@ -1,41 +1,47 @@
 "use client";
 
-import { useActionState, useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { createOrder, type OrderActionState } from "@/actions/orders";
+import type { OrderActionState } from "@/actions/orders";
 import { formatILS } from "@/lib/pricing";
 import { NEIGHBORHOODS } from "@/lib/validation";
+import { useCart } from "@/lib/cart-context";
+
+export const initialOrderState: OrderActionState = {};
 
 type Props = {
-  set: {
-    id: string;
-    slug: string;
-    name: string;
-    etrogType: string;
-    price: number;
-  };
+  state: OrderActionState;
+  formAction: (formData: FormData) => void;
+  pending: boolean;
 };
 
-const initialState: OrderActionState = {};
-
-export function CheckoutWizard({ set }: Props) {
+export function CheckoutWizard({ state, formAction, pending }: Props) {
   const router = useRouter();
+  const { items, totalPrice, clear } = useCart();
   const [step, setStep] = useState<1 | 2>(1);
-  const [state, formAction, pending] = useActionState(createOrder, initialState);
 
   const [customerName, setCustomerName] = useState("");
   const [phone, setPhone] = useState("");
   const [neighborhood, setNeighborhood] = useState<string>("");
   const [address, setAddress] = useState("");
 
-  const depositAmount = Math.round((set.price * 20) / 100);
+  const depositAmount = Math.round((totalPrice * 20) / 100);
+  const itemsJson = JSON.stringify(
+    items.map((i) => ({ setId: i.setId, quantity: i.quantity }))
+  );
 
   const step1Valid =
     customerName.trim().length >= 2 &&
     /^0\d{8,9}$/.test(phone.trim()) &&
     !!neighborhood &&
     address.trim().length >= 3;
+
+  useEffect(() => {
+    if (state.success) {
+      clear();
+    }
+  }, [state.success, clear]);
 
   if (state.success) {
     return (
@@ -62,9 +68,13 @@ export function CheckoutWizard({ set }: Props) {
     );
   }
 
+  if (items.length === 0) {
+    return null;
+  }
+
   return (
     <form action={formAction} className="space-y-6">
-      <input type="hidden" name="setId" value={set.id} />
+      <input type="hidden" name="items" value={itemsJson} />
 
       {/* Step indicator */}
       <div className="flex items-center gap-2 text-sm font-medium text-emerald-700">
@@ -156,8 +166,15 @@ export function CheckoutWizard({ set }: Props) {
       {/* Step 2: payment + confirmation */}
       <fieldset className={step === 2 ? "space-y-4" : "hidden"}>
         <div className="rounded-2xl bg-emerald-50 p-5 space-y-2">
-          <Row label="הסט שנבחר" value={set.name} />
-          <Row label="מחיר כולל" value={formatILS(set.price / 100)} />
+          {items.map((i) => (
+            <Row
+              key={i.setId}
+              label={`${i.name} × ${i.quantity}`}
+              value={formatILS((i.price * i.quantity) / 100)}
+            />
+          ))}
+          <div className="my-1 h-px bg-emerald-200" />
+          <Row label="מחיר כולל" value={formatILS(totalPrice / 100)} />
           <Row
             label="מקדמה לתשלום (20%)"
             value={formatILS(depositAmount / 100)}

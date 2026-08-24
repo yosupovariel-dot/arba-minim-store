@@ -2,8 +2,13 @@ import { z } from "zod";
 
 export const NEIGHBORHOODS = ["נחלת יהודה", "אברמוביץ"] as const;
 
-export const OrderFormSchema = z.object({
+export const CartItemSchema = z.object({
   setId: z.string().min(1),
+  quantity: z.number().int().min(1).max(50),
+});
+
+export const OrderFormSchema = z.object({
+  items: z.array(CartItemSchema).min(1, { error: "הסל ריק" }),
   customerName: z.string().trim().min(2, { error: "יש להזין שם מלא" }),
   phone: z
     .string()

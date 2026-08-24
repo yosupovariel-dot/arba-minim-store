@@ -44,7 +44,7 @@ model ProductSet {
   active      Boolean  @default(true)
   sortOrder   Int      @default(0)
   images      SetMedia[]
-  orders      Order[]
+  orderItems  OrderItem[]
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 }
@@ -66,10 +66,8 @@ model SetMedia {
 model Order {
   id                String      @id @default(cuid())
   orderNumber       Int         @unique
-  setId             String
-  set               ProductSet  @relation(fields: [setId], references: [id])
-  setNameSnapshot   String
-  priceSnapshot     Int
+  items             OrderItem[]
+  totalPrice        Int
   depositAmount     Int
 
   customerName      String
@@ -90,4 +88,17 @@ model Order {
 
   createdAt         DateTime    @default(now())
   updatedAt         DateTime    @updatedAt
+}
+
+model OrderItem {
+  id                String     @id @default(cuid())
+  orderId           String
+  order             Order      @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  setId             String
+  set               ProductSet @relation(fields: [setId], references: [id])
+  setNameSnapshot   String
+  etrogTypeSnapshot String
+  unitPrice         Int
+  quantity          Int
+  createdAt         DateTime   @default(now())
 }

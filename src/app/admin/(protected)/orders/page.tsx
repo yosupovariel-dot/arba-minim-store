@@ -22,6 +22,7 @@ export default async function AdminOrdersPage({
   const orders = await prisma.order.findMany({
     where: statusFilter ? { status: statusFilter as never } : undefined,
     orderBy: { createdAt: "desc" },
+    include: { items: true },
   });
 
   const sheetsConfigured = isGoogleSheetsConfigured();
@@ -96,8 +97,12 @@ export default async function AdminOrdersPage({
                     {o.phone}
                   </div>
                 </td>
-                <td className="px-4 py-3">{o.setNameSnapshot}</td>
-                <td className="px-4 py-3">{formatILS(o.priceSnapshot / 100)}</td>
+                <td className="px-4 py-3">
+                  {o.items.length === 1
+                    ? `${o.items[0].setNameSnapshot} × ${o.items[0].quantity}`
+                    : `${o.items.reduce((s, i) => s + i.quantity, 0)} פריטים (${o.items.length} סוגים)`}
+                </td>
+                <td className="px-4 py-3">{formatILS(o.totalPrice / 100)}</td>
                 <td className="px-4 py-3">{formatILS(o.depositAmount / 100)}</td>
                 <td className="px-4 py-3">
                   {o.depositConfirmed ? (

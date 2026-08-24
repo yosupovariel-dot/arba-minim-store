@@ -2,7 +2,7 @@ import { notFound } from "next/navigation";
 import Image from "next/image";
 import { prisma } from "@/lib/prisma";
 import { formatILS } from "@/lib/pricing";
-import { CheckoutWizard } from "@/components/CheckoutWizard";
+import { AddToCartControl } from "@/components/AddToCartControl";
 
 export default async function SetDetailPage({
   params,
@@ -78,21 +78,17 @@ export default async function SetDetailPage({
           </div>
 
           <div className="mt-8">
-            {soldOut ? (
-              <div className="rounded-2xl bg-neutral-100 p-6 text-center font-semibold text-neutral-500">
-                לצערנו אזל המלאי עבור סט זה
-              </div>
-            ) : (
-              <CheckoutWizard
-                set={{
-                  id: set.id,
-                  slug: set.slug,
-                  name: set.name,
-                  etrogType: set.etrogType,
-                  price: set.price,
-                }}
-              />
-            )}
+            <AddToCartControl
+              set={{
+                id: set.id,
+                slug: set.slug,
+                name: set.name,
+                etrogType: set.etrogType,
+                price: set.price,
+                kind: set.kind,
+              }}
+              remaining={remaining}
+            />
           </div>
         </div>
       </div>

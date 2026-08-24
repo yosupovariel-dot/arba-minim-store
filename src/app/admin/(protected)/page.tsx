@@ -4,25 +4,30 @@ import { StatCard } from "@/components/StatCard";
 
 export default async function AdminDashboardPage() {
   const orders = await prisma.order.findMany({
-    include: { set: true },
+    include: { items: true },
     orderBy: { createdAt: "desc" },
   });
 
   const activeOrders = orders.filter((o) => o.status !== "CANCELLED");
   const totalOrders = orders.length;
-  const totalSetsSold = activeOrders.length;
-  const totalSales = activeOrders.reduce((sum, o) => sum + o.priceSnapshot, 0);
+  const totalSetsSold = activeOrders.reduce(
+    (sum, o) => sum + o.items.reduce((s, i) => s + i.quantity, 0),
+    0
+  );
+  const totalSales = activeOrders.reduce((sum, o) => sum + o.totalPrice, 0);
   const depositsPending = activeOrders.filter(
     (o) => o.depositMarkedPaid && !o.depositConfirmed
   ).length;
 
   const bySet = new Map<string, { name: string; count: number }>();
   for (const o of activeOrders) {
-    const existing = bySet.get(o.setId);
-    if (existing) {
-      existing.count += 1;
-    } else {
-      bySet.set(o.setId, { name: o.setNameSnapshot, count: 1 });
+    for (const item of o.items) {
+      const existing = bySet.get(item.setId);
+      if (existing) {
+        existing.count += item.quantity;
+      } else {
+        bySet.set(item.setId, { name: item.setNameSnapshot, count: item.quantity });
+      }
     }
   }
 

@@ -14,14 +14,17 @@ export default async function AdminOrderDetailPage({
   params,
 }: PageProps<"/admin/orders/[id]">) {
   const { id } = await params;
-  const order = await prisma.order.findUnique({ where: { id } });
+  const order = await prisma.order.findUnique({ where: { id }, include: { items: true } });
   if (!order) notFound();
 
   const confirmDepositAction = confirmDeposit.bind(null, order.id);
   const unconfirmDepositAction = unconfirmDeposit.bind(null, order.id);
   const saveNotesAction = saveAdminNotes.bind(null, order.id);
 
-  const whatsappMessage = `שלום ${order.customerName}, ההזמנה שלך (מס' ${order.orderNumber}) לסט "${order.setNameSnapshot}" התקבלה במערכת.`;
+  const itemsSummary = order.items
+    .map((i) => `${i.setNameSnapshot} × ${i.quantity}`)
+    .join(", ");
+  const whatsappMessage = `שלום ${order.customerName}, ההזמנה שלך (מס' ${order.orderNumber}) — ${itemsSummary} — התקבלה במערכת.`;
   const customerWhatsappLink = `https://wa.me/972${order.phone.replace(/^0/, "")}?text=${encodeURIComponent(
     whatsappMessage
   )}`;
@@ -61,8 +64,19 @@ export default async function AdminOrderDetailPage({
 
         <section className="rounded-2xl border border-emerald-100 bg-white p-5 shadow-sm space-y-2">
           <h2 className="mb-2 font-bold text-emerald-950">פרטי הזמנה ותשלום</h2>
-          <Row label="סט" value={order.setNameSnapshot} />
-          <Row label="מחיר כולל" value={formatILS(order.priceSnapshot / 100)} />
+          <div className="space-y-1 rounded-xl bg-emerald-50 p-3">
+            {order.items.map((i) => (
+              <div key={i.id} className="flex items-center justify-between text-sm">
+                <span className="text-emerald-900">
+                  {i.setNameSnapshot} × {i.quantity}
+                </span>
+                <span className="font-medium text-emerald-950">
+                  {formatILS((i.unitPrice * i.quantity) / 100)}
+                </span>
+              </div>
+            ))}
+          </div>
+          <Row label="מחיר כולל" value={formatILS(order.totalPrice / 100)} />
           <Row label="מקדמה נדרשת" value={formatILS(order.depositAmount / 100)} />
           <Row
             label="הלקוח סימן שהעביר"

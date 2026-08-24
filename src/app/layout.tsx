@@ -7,6 +7,7 @@ import { WhatsAppButton } from "@/components/WhatsAppButton";
 import { AccessibilityWidget } from "@/components/AccessibilityWidget";
 import { ConsentBanner } from "@/components/ConsentBanner";
 import { GoogleAnalytics } from "@/components/GoogleAnalytics";
+import { CartProvider } from "@/lib/cart-context";
 
 const heebo = Heebo({
   variable: "--font-heebo",
@@ -24,9 +25,11 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
     <html lang="he" dir="rtl" className={`${heebo.variable} h-full antialiased`}>
       <body className="min-h-full flex flex-col bg-[radial-gradient(circle_at_top,#f2f9f0,transparent_55%)]">
         <GoogleAnalytics />
-        <Header />
-        <main className="flex-1">{children}</main>
-        <Footer />
+        <CartProvider>
+          <Header />
+          <main className="flex-1">{children}</main>
+          <Footer />
+        </CartProvider>
         <WhatsAppButton />
         <AccessibilityWidget />
         <ConsentBanner />

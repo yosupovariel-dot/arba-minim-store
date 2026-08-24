@@ -18,8 +18,15 @@ export async function createOrder(
   _prevState: OrderActionState,
   formData: FormData
 ): Promise<OrderActionState> {
+  let items: unknown;
+  try {
+    items = JSON.parse(String(formData.get("items") || "[]"));
+  } catch {
+    items = [];
+  }
+
   const raw = {
-    setId: formData.get("setId"),
+    items,
     customerName: formData.get("customerName"),
     phone: formData.get("phone"),
     email: formData.get("email"),
@@ -39,12 +46,49 @@ export async function createOrder(
 
   try {
     const result = await prisma.$transaction(async (tx) => {
-      const set = await tx.productSet.findUnique({ where: { id: data.setId } });
-      if (!set || !set.active) {
-        throw new Error("הסט המבוקש אינו זמין");
+      // Merge duplicate setIds (defensive — the cart UI shouldn't produce
+      // these, but never trust client-submitted data).
+      const quantityBySetId = new Map<string, number>();
+      for (const item of data.items) {
+        quantityBySetId.set(item.setId, (quantityBySetId.get(item.setId) || 0) + item.quantity);
       }
-      if (set.stockTotal != null && set.stockSold >= set.stockTotal) {
-        throw new Error("אזל המלאי עבור סט זה");
+
+      let totalPrice = 0;
+      const itemsToCreate: {
+        setId: string;
+        setNameSnapshot: string;
+        etrogTypeSnapshot: string;
+        unitPrice: number;
+        quantity: number;
+      }[] = [];
+
+      for (const [setId, quantity] of quantityBySetId) {
+        const set = await tx.productSet.findUnique({ where: { id: setId } });
+        if (!set || !set.active) {
+          throw new Error("אחד הסטים בסל אינו זמין יותר. נא לרענן את הסל.");
+        }
+        if (set.stockTotal != null && set.stockSold + quantity > set.stockTotal) {
+          const remaining = Math.max(set.stockTotal - set.stockSold, 0);
+          throw new Error(
+            `אין מספיק מלאי עבור "${set.name}" — נותרו ${remaining} יחידות בלבד.`
+          );
+        }
+
+        totalPrice += set.price * quantity;
+        itemsToCreate.push({
+          setId: set.id,
+          setNameSnapshot: set.name,
+          etrogTypeSnapshot: set.etrogType,
+          unitPrice: set.price,
+          quantity,
+        });
+
+        if (set.stockTotal != null) {
+          await tx.productSet.update({
+            where: { id: set.id },
+            data: { stockSold: { increment: quantity } },
+          });
+        }
       }
 
       const orderCount = await tx.order.count();
@@ -53,10 +97,8 @@ export async function createOrder(
       const order = await tx.order.create({
         data: {
           orderNumber,
-          setId: set.id,
-          setNameSnapshot: set.name,
-          priceSnapshot: set.price,
-          depositAmount: calcDeposit(set.price),
+          totalPrice,
+          depositAmount: calcDeposit(totalPrice),
           customerName: data.customerName,
           phone: data.phone,
           email: data.email || null,
@@ -66,15 +108,9 @@ export async function createOrder(
           depositMarkedPaid: true,
           depositMarkedAt: new Date(),
           termsAccepted: true,
+          items: { create: itemsToCreate },
         },
       });
-
-      if (set.stockTotal != null) {
-        await tx.productSet.update({
-          where: { id: set.id },
-          data: { stockSold: { increment: 1 } },
-        });
-      }
 
       return order;
     });
@@ -120,19 +156,21 @@ export async function setOrderStatus(orderId: string, status: "PENDING" | "CONFI
   await verifyAdminSession();
 
   await prisma.$transaction(async (tx) => {
-    const order = await tx.order.findUnique({ where: { id: orderId } });
+    const order = await tx.order.findUnique({ where: { id: orderId }, include: { items: true } });
     if (!order) return;
 
     const wasCancelled = order.status === "CANCELLED";
     const willBeCancelled = status === "CANCELLED";
 
     if (wasCancelled !== willBeCancelled) {
-      const set = await tx.productSet.findUnique({ where: { id: order.setId } });
-      if (set?.stockTotal != null) {
-        await tx.productSet.update({
-          where: { id: set.id },
-          data: { stockSold: { increment: willBeCancelled ? -1 : 1 } },
-        });
+      for (const item of order.items) {
+        const set = await tx.productSet.findUnique({ where: { id: item.setId } });
+        if (set?.stockTotal != null) {
+          await tx.productSet.update({
+            where: { id: set.id },
+            data: { stockSold: { increment: willBeCancelled ? -item.quantity : item.quantity } },
+          });
+        }
       }
     }
 
