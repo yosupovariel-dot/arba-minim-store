@@ -53,6 +53,24 @@ function getSheetsClient() {
   return google.sheets({ version: "v4", auth });
 }
 
+// A brand-new spreadsheet only has a default "Sheet1" tab — create the
+// "הזמנות" tab on first use instead of requiring the owner to rename it.
+async function ensureOrdersTabExists(
+  sheets: ReturnType<typeof google.sheets>,
+  spreadsheetId: string
+) {
+  const meta = await sheets.spreadsheets.get({ spreadsheetId });
+  const exists = meta.data.sheets?.some((s) => s.properties?.title === SHEET_NAME);
+  if (exists) return;
+
+  await sheets.spreadsheets.batchUpdate({
+    spreadsheetId,
+    requestBody: {
+      requests: [{ addSheet: { properties: { title: SHEET_NAME } } }],
+    },
+  });
+}
+
 // Best-effort, full-table resync: rewrites the whole "הזמנות" sheet from the
 // current DB state on every order create/update. Simpler and less
 // error-prone than incremental row patching, and cheap at this store's
@@ -64,6 +82,7 @@ export async function resyncOrdersSheet() {
   try {
     const spreadsheetId = process.env.GOOGLE_SHEETS_SPREADSHEET_ID!;
     const sheets = getSheetsClient();
+    await ensureOrdersTabExists(sheets, spreadsheetId);
 
     const orders = await prisma.order.findMany({
       orderBy: { orderNumber: "asc" },
