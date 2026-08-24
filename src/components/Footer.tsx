@@ -54,6 +54,18 @@ export function Footer() {
       </div>
       <div className="border-t border-emerald-100 py-4 text-center text-xs text-emerald-600">
         © {new Date().getFullYear()} {SITE.siteName}. כל הזכויות שמורות.
+        {" · "}
+        <span>
+          האתר נבנה על ידי{" "}
+          <a
+            href="https://arielyosupov-webdesign.com"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="underline hover:text-emerald-900"
+          >
+            Ariel Yosupov
+          </a>
+        </span>
       </div>
     </footer>
   );
