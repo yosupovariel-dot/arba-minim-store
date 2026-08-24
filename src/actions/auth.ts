@@ -1,0 +1,69 @@
+"use server";
+
+import bcrypt from "bcryptjs";
+import { redirect } from "next/navigation";
+import { prisma } from "@/lib/prisma";
+import { createAdminSession, destroyAdminSession } from "@/lib/session";
+import { LoginSchema } from "@/lib/validation";
+
+export type LoginState = {
+  error?: string;
+};
+
+export async function login(_prevState: LoginState, formData: FormData): Promise<LoginState> {
+  const parsed = LoginSchema.safeParse({
+    username: formData.get("username"),
+    password: formData.get("password"),
+  });
+
+  if (!parsed.success) {
+    return { error: "יש להזין שם משתמש וסיסמה" };
+  }
+
+  const { username, password } = parsed.data;
+
+  const admin = await prisma.adminUser.findUnique({ where: { username } });
+  if (!admin) {
+    // Constant-time-ish: still hash to avoid trivially distinguishing
+    // "user not found" from "wrong password" via timing.
+    await bcrypt.compare(password, "$2b$10$invalidsaltinvalidsaltinvalidsal");
+    return { error: "שם משתמש או סיסמה שגויים" };
+  }
+
+  if (admin.lockedUntil && admin.lockedUntil > new Date()) {
+    const minutes = Math.ceil((admin.lockedUntil.getTime() - Date.now()) / 60000);
+    return { error: `יותר מדי ניסיונות כושלים. נסו שוב בעוד כ-${minutes} דקות` };
+  }
+
+  const valid = await bcrypt.compare(password, admin.passwordHash);
+  if (!valid) {
+    const attempts = admin.failedAttempts + 1;
+    const LOCK_THRESHOLD = 5;
+    await prisma.adminUser.update({
+      where: { id: admin.id },
+      data: {
+        failedAttempts: attempts,
+        lockedUntil:
+          attempts >= LOCK_THRESHOLD
+            ? new Date(Date.now() + 15 * 60 * 1000)
+            : admin.lockedUntil,
+      },
+    });
+    return { error: "שם משתמש או סיסמה שגויים" };
+  }
+
+  if (admin.failedAttempts > 0 || admin.lockedUntil) {
+    await prisma.adminUser.update({
+      where: { id: admin.id },
+      data: { failedAttempts: 0, lockedUntil: null },
+    });
+  }
+
+  await createAdminSession({ adminId: admin.id, username: admin.username });
+  redirect("/admin");
+}
+
+export async function logout() {
+  await destroyAdminSession();
+  redirect("/admin/login");
+}

@@ -1,0 +1,57 @@
+@import "tailwindcss";
+
+:root {
+  --background: #fbfdf8;
+  --foreground: #16321c;
+  --a11y-scale: 1;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-heebo);
+}
+
+html {
+  font-size: calc(16px * var(--a11y-scale));
+  scroll-behavior: smooth;
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-heebo), Arial, Helvetica, sans-serif;
+}
+
+/* ---- Accessibility widget helper classes ---- */
+
+.a11y-contrast {
+  filter: contrast(1.25) saturate(1.15);
+}
+.a11y-contrast body {
+  background: #ffffff;
+  color: #000000;
+}
+
+.a11y-underline-links a {
+  text-decoration: underline !important;
+  text-underline-offset: 3px;
+}
+
+.a11y-grayscale {
+  filter: grayscale(1);
+}
+
+.a11y-pause-animations *,
+.a11y-pause-animations *::before,
+.a11y-pause-animations *::after {
+  animation-duration: 0.001ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.001ms !important;
+  scroll-behavior: auto !important;
+}
+
+:focus-visible {
+  outline: 3px solid #2f7a3d;
+  outline-offset: 2px;
+}

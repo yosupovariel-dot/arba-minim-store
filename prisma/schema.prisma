@@ -1,0 +1,93 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  // Local dev uses SQLite for zero-setup. Before deploying, switch to
+  // "postgresql" and point DATABASE_URL at your managed Postgres (see README).
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+enum SetKind {
+  REGULAR
+  SPECIAL
+}
+
+enum OrderStatus {
+  PENDING
+  CONFIRMED
+  CANCELLED
+  COMPLETED
+}
+
+model AdminUser {
+  id             String    @id @default(cuid())
+  username       String    @unique
+  passwordHash   String
+  failedAttempts Int       @default(0)
+  lockedUntil    DateTime?
+  createdAt      DateTime  @default(now())
+}
+
+model ProductSet {
+  id          String   @id @default(cuid())
+  kind        SetKind
+  slug        String   @unique
+  name        String
+  etrogType   String
+  description String
+  price       Int
+  // total stock only meaningful for SPECIAL sets; NULL/ignored for REGULAR (unlimited for now)
+  stockTotal  Int?
+  stockSold   Int      @default(0)
+  active      Boolean  @default(true)
+  sortOrder   Int      @default(0)
+  images      SetMedia[]
+  orders      Order[]
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+enum MediaType {
+  IMAGE
+  VIDEO
+}
+
+model SetMedia {
+  id        String    @id @default(cuid())
+  setId     String
+  set       ProductSet @relation(fields: [setId], references: [id], onDelete: Cascade)
+  type      MediaType
+  url       String
+  sortOrder Int       @default(0)
+}
+
+model Order {
+  id                String      @id @default(cuid())
+  orderNumber       Int         @unique
+  setId             String
+  set               ProductSet  @relation(fields: [setId], references: [id])
+  setNameSnapshot   String
+  priceSnapshot     Int
+  depositAmount     Int
+
+  customerName      String
+  phone             String
+  email             String?
+  neighborhood      String
+  address           String
+  notes             String?
+
+  depositMarkedPaid Boolean     @default(false)
+  depositMarkedAt   DateTime?
+  depositConfirmed  Boolean     @default(false)
+  depositConfirmedAt DateTime?
+
+  termsAccepted     Boolean     @default(false)
+  status            OrderStatus @default(PENDING)
+  adminNotes        String?
+
+  createdAt         DateTime    @default(now())
+  updatedAt         DateTime    @updatedAt
+}
