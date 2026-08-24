@@ -46,6 +46,40 @@ npm run dev
   ידנית — כפתור בעמוד ההזמנה במערכת הניהול פותח וואטסאפ עם טקסט מוכן
   מראש, שהמנהל שולח בלחיצה. שילוב API אוטומטי (למשל Twilio) אפשרי בהמשך.
 
+## סנכרון ל-Google Sheets (אופציונלי)
+
+מערכת הניהול יכולה לשמור עותק חי של כל ההזמנות בגיליון Google Sheets —
+מתעדכן אוטומטית בכל הזמנה חדשה, אישור מקדמה, שינוי סטטוס וכו'. כברירת
+מחדל זה כבוי (משתני הסביבה ריקים); כשלא מוגדר, שום דבר לא נשבר — פשוט
+אין סנכרון.
+
+**איך להפעיל (חד-פעמי, דורש חשבון Google):**
+
+1. היכנסו ל-[Google Cloud Console](https://console.cloud.google.com/),
+   צרו פרויקט חדש (או השתמשו בקיים).
+2. הפעילו את ה-API: **Google Sheets API** (תפריט APIs & Services → Enable
+   APIs → חיפוש "Google Sheets API" → Enable).
+3. צרו **Service Account**: APIs & Services → Credentials → Create
+   Credentials → Service Account. תנו לו שם (למשל `arba-minim-sync`).
+4. בתוך ה-Service Account שנוצר → לשונית Keys → Add Key → Create new key
+   → סוג **JSON**. יורד קובץ JSON — שם יש `client_email` ו-`private_key`.
+5. צרו גיליון Google Sheets חדש (ריק), ושתפו אותו (כפתור Share) עם
+   כתובת המייל מתוך `client_email` (משהו כמו
+   `arba-minim-sync@your-project.iam.gserviceaccount.com`), עם הרשאת
+   **עריכה (Editor)**.
+6. העתיקו את מזהה הגיליון מתוך כתובת ה-URL שלו (החלק בין `/d/` ל-`/edit`).
+7. מלאו ב-`.env` (או במשתני הסביבה ב-Vercel):
+   ```bash
+   GOOGLE_SHEETS_SPREADSHEET_ID="המזהה מהשלב 6"
+   GOOGLE_SERVICE_ACCOUNT_EMAIL="client_email מהקובץ JSON"
+   GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY="private_key מהקובץ JSON (עם ה-\n בפנים, במרכאות)"
+   ```
+8. הפעילו מחדש את השרת. בעמוד `/admin/orders` יופיע פס ירוק "סנכרון
+   פעיל" במקום הפס הכתום, ויש גם כפתור "סנכרון ידני עכשיו".
+
+הגיליון נכתב מחדש במלואו (לשונית בשם "הזמנות") בכל שינוי בהזמנה — כך
+שהוא תמיד משקף בדיוק את מה שיש במערכת, ללא סיכון לשורות כפולות.
+
 ## פריסה לפרודקשן (Vercel)
 
 1. **בסיס נתונים**: הקימו בסיס Postgres מנוהל (Supabase / Neon / Vercel

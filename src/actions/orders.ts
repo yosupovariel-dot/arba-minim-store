@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { OrderFormSchema } from "@/lib/validation";
 import { calcDeposit } from "@/lib/pricing";
 import { verifyAdminSession } from "@/lib/dal";
+import { resyncOrdersSheet } from "@/lib/googleSheets";
 import { revalidatePath } from "next/cache";
 
 export type OrderActionState = {
@@ -81,6 +82,7 @@ export async function createOrder(
     revalidatePath("/");
     revalidatePath("/admin/orders");
     revalidatePath("/admin");
+    await resyncOrdersSheet();
 
     return { success: true, orderNumber: result.orderNumber };
   } catch (err) {
@@ -99,6 +101,7 @@ export async function confirmDeposit(orderId: string) {
   revalidatePath("/admin/orders");
   revalidatePath(`/admin/orders/${orderId}`);
   revalidatePath("/admin");
+  await resyncOrdersSheet();
 }
 
 export async function unconfirmDeposit(orderId: string) {
@@ -110,6 +113,7 @@ export async function unconfirmDeposit(orderId: string) {
   revalidatePath("/admin/orders");
   revalidatePath(`/admin/orders/${orderId}`);
   revalidatePath("/admin");
+  await resyncOrdersSheet();
 }
 
 export async function setOrderStatus(orderId: string, status: "PENDING" | "CONFIRMED" | "CANCELLED" | "COMPLETED") {
@@ -138,6 +142,7 @@ export async function setOrderStatus(orderId: string, status: "PENDING" | "CONFI
   revalidatePath("/admin/orders");
   revalidatePath(`/admin/orders/${orderId}`);
   revalidatePath("/admin");
+  await resyncOrdersSheet();
 }
 
 export async function saveAdminNotes(orderId: string, formData: FormData) {
@@ -145,4 +150,11 @@ export async function saveAdminNotes(orderId: string, formData: FormData) {
   const notes = String(formData.get("notes") || "");
   await prisma.order.update({ where: { id: orderId }, data: { adminNotes: notes } });
   revalidatePath(`/admin/orders/${orderId}`);
+  await resyncOrdersSheet();
+}
+
+export async function manualSheetResync() {
+  await verifyAdminSession();
+  await resyncOrdersSheet();
+  revalidatePath("/admin/orders");
 }

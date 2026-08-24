@@ -2,6 +2,8 @@ import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { formatILS } from "@/lib/pricing";
 import { OrderStatusBadge } from "@/components/OrderStatusBadge";
+import { isGoogleSheetsConfigured } from "@/lib/googleSheets";
+import { manualSheetResync } from "@/actions/orders";
 
 const STATUS_FILTERS = [
   { value: "", label: "הכל" },
@@ -22,8 +24,31 @@ export default async function AdminOrdersPage({
     orderBy: { createdAt: "desc" },
   });
 
+  const sheetsConfigured = isGoogleSheetsConfigured();
+
   return (
     <div className="space-y-6">
+      <div
+        className={`flex flex-wrap items-center justify-between gap-3 rounded-2xl border px-4 py-3 text-sm ${
+          sheetsConfigured
+            ? "border-emerald-200 bg-emerald-50 text-emerald-800"
+            : "border-amber-200 bg-amber-50 text-amber-800"
+        }`}
+      >
+        <span>
+          {sheetsConfigured
+            ? "סנכרון ל-Google Sheets פעיל — כל שינוי בהזמנה מתעדכן אוטומטית בגיליון."
+            : "סנכרון ל-Google Sheets לא מוגדר עדיין. יש להשלים את משתני הסביבה (ראו README)."}
+        </span>
+        {sheetsConfigured && (
+          <form action={manualSheetResync}>
+            <button className="rounded-full bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-700">
+              סנכרון ידני עכשיו
+            </button>
+          </form>
+        )}
+      </div>
+
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-2xl font-extrabold text-emerald-950">הזמנות</h1>
         <div className="flex flex-wrap gap-2">
